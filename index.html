@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CryptoLens — Transaction Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0a0a0f; --surface:#111118; --surface2:#1a1a24;
+  --border:rgba(255,255,255,.07); --border2:rgba(255,255,255,.12);
+  --text:#e8e8f0; --muted:#6b6b80; --accent:#7c6bff; --accent2:#a594ff;
+  --green:#3ecf8e; --red:#f87171; --blue:#60a5fa; --amber:#fbbf24; --teal:#2dd4bf;
+  --font-d:'Syne',sans-serif; --font-m:'DM Mono',monospace;
+  --r:10px; --rl:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-d);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+
+/* Header */
+.header{position:relative;padding:36px 48px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.logo{font-size:22px;font-weight:800;letter-spacing:-.5px}.logo span{color:var(--accent2)}
+.header-tag{font-family:var(--font-m);font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:4px 10px;border-radius:20px}
+
+/* Disclaimer */
+.disclaimer{background:rgba(251,191,36,.06);border-bottom:1px solid rgba(251,191,36,.15);padding:10px 48px;display:flex;align-items:flex-start;gap:8px;font-family:var(--font-m);font-size:11px;color:rgba(251,191,36,.7);line-height:1.6}
+.disclaimer strong{color:rgba(251,191,36,.9)}
+
+/* Session banner */
+.session-banner{max-width:780px;margin:24px auto 0;padding:0 24px;display:none}
+.session-banner.show{display:block}
+.session-card{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.session-info{font-family:var(--font-m);font-size:11px;color:var(--muted);line-height:1.7}
+.session-info strong{color:var(--text)}
+.session-btns{display:flex;gap:8px;flex-shrink:0}
+.btn-restore{padding:7px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-family:var(--font-d);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-restore:hover{background:var(--accent2)}
+.btn-discard{padding:7px 12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;font-family:var(--font-m);font-size:11px;cursor:pointer;transition:all .15s}
+.btn-discard:hover{color:var(--text);border-color:var(--border2)}
+
+/* Upload */
+.upload-zone{max-width:780px;margin:48px auto;padding:0 24px}
+.upload-title{font-size:38px;font-weight:800;line-height:1.1;letter-spacing:-1.5px;margin-bottom:12px}
+.upload-title em{font-style:normal;color:var(--accent2)}
+.upload-sub{font-family:var(--font-m);font-size:12px;color:var(--muted);margin-bottom:32px}
+.dropzone{border:1.5px dashed var(--border2);border-radius:var(--rl);padding:48px 40px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface);position:relative;overflow:hidden}
+.dropzone::before{content:'';position:absolute;inset:0;opacity:0;background:radial-gradient(ellipse at 50% 0%,rgba(124,107,255,.15) 0%,transparent 70%);transition:opacity .3s}
+.dropzone:hover,.dropzone.drag{border-color:var(--accent);background:var(--surface2)}
+.dropzone:hover::before,.dropzone.drag::before{opacity:1}
+.drop-icon{font-size:32px;margin-bottom:14px}.drop-text{font-size:15px;font-weight:600;margin-bottom:6px}
+.drop-hint{font-family:var(--font-m);font-size:11px;color:var(--muted)}
+#fileInput{display:none}
+
+/* Prices */
+.prices-section{max-width:780px;margin:0 auto 16px;padding:0 24px;display:none}
+.prices-section.show{display:block}
+.section-label{font-family:var(--font-m);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+.prices-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:8px}
+.price-input-wrap{display:flex;flex-direction:column;gap:4px}
+.price-input-wrap label{font-family:var(--font-m);font-size:10px;color:var(--muted)}
+.price-input-wrap input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-family:var(--font-m);font-size:12px;color:var(--text);width:100%;transition:border-color .15s}
+.price-input-wrap input:focus{outline:none;border-color:var(--accent)}
+.price-input-wrap input::placeholder{color:var(--muted)}
+
+/* Action buttons */
+.action-wrap{max-width:780px;margin:0 auto 40px;padding:0 24px;display:none}
+.action-wrap.show{display:flex;gap:10px;flex-wrap:wrap}
+.btn-primary{flex:1;padding:13px 24px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);font-family:var(--font-d);font-size:14px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-primary:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(124,107,255,.3)}
+.btn-fetch{padding:13px 18px;background:transparent;color:var(--teal);border:1px solid var(--teal);border-radius:var(--r);font-family:var(--font-d);font-size:13px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-fetch:hover{background:rgba(45,212,191,.1);transform:translateY(-1px)}
+.btn-fetch:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-sec{padding:13px 18px;background:transparent;color:var(--muted);border:1px solid var(--border2);border-radius:var(--r);font-family:var(--font-d);font-size:13px;cursor:pointer;transition:all .15s}
+.btn-sec:hover{color:var(--text);border-color:var(--border2);background:var(--surface2)}
+.fetch-status{font-family:var(--font-m);font-size:11px;margin-top:8px;min-height:14px;padding:0 2px}
+.fetch-status .ok{color:var(--green)}.fetch-status .warn{color:var(--amber)}.fetch-status .err{color:var(--red)}
+
+/* Loading */
+.loading{display:none;max-width:780px;margin:0 auto;padding:32px 24px;text-align:center}
+.loading.show{display:block}
+.spinner{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:var(--font-m);font-size:12px;color:var(--muted)}
+
+/* Toolbar */
+.toolbar{display:none;padding:0 48px 18px;align-items:center;gap:10px;flex-wrap:wrap}
+.toolbar.show{display:flex}
+.toolbar-label{font-family:var(--font-m);font-size:11px;color:var(--muted)}
+.btn-tb{padding:7px 14px;border-radius:6px;font-family:var(--font-m);font-size:11px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;border:1px solid var(--border2)}
+.btn-tb-accent{background:var(--accent);color:#fff;border-color:var(--accent);font-family:var(--font-d);font-weight:600;font-size:12px}
+.btn-tb-accent:hover{background:var(--accent2);border-color:var(--accent2)}
+.btn-tb-teal{background:transparent;color:var(--teal);border-color:var(--teal)}
+.btn-tb-teal:hover{background:rgba(45,212,191,.1)}
+.btn-tb-teal:disabled{opacity:.4;cursor:not-allowed}
+.btn-tb-muted{background:transparent;color:var(--muted)}
+.btn-tb-muted:hover{color:var(--text);border-color:var(--border2)}
+.tb-status{font-family:var(--font-m);font-size:10px;color:var(--muted)}
+.tb-status .ok{color:var(--green)}.tb-status .warn{color:var(--amber)}.tb-status .err{color:var(--red)}
+.tb-time{font-family:var(--font-m);font-size:10px;color:var(--muted)}
+
+/* Summary cards */
+.summary-bar{padding:0 48px 24px;display:none}
+.summary-bar.show{display:block}
+.summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;max-width:1600px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.sum-label{font-family:var(--font-m);font-size:10px;color:var(--muted);margin-bottom:5px;letter-spacing:.04em}
+.sum-value{font-size:19px;font-weight:700}
+
+/* Table area */
+.table-area{padding:0 48px 60px;display:none}
+.table-area.show{display:block}
+.table-title{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;font-family:var(--font-m)}
+.crypto-table{width:100%;border-collapse:collapse;font-family:var(--font-m);font-size:12px}
+.crypto-table thead tr{border-bottom:1px solid var(--border2)}
+.crypto-table th{padding:9px 12px;text-align:right;color:var(--muted);font-size:10px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.crypto-table th:first-child{text-align:left}
+.crypto-table tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
+.crypto-table tbody tr:hover{background:var(--surface2)}
+.crypto-table td{padding:10px 12px;text-align:right;color:var(--muted);vertical-align:middle;white-space:nowrap}
+.crypto-table td:first-child{text-align:left}
+.sym-badge{display:inline-flex;align-items:center;font-weight:600;font-size:12px;padding:3px 10px;border-radius:20px;font-family:var(--font-d)}
+.val{color:var(--text)}.val-green{color:var(--green);font-weight:600}.val-red{color:var(--red);font-weight:600}
+.val-blue{color:var(--blue)}.val-teal{color:var(--teal)}.val-amber{color:var(--amber)}.dash{color:#2a2a3a}
+
+/* Detail expand */
+.detail-row{display:none}
+.detail-row.open{display:table-row}
+.detail-cell{padding:0!important}
+.detail-inner{padding:20px 20px 16px;background:var(--surface);border-bottom:1px solid var(--border2)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.detail-tables{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:14px}
+.dsec{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+.drows{display:flex;flex-direction:column;gap:5px}
+.drow{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11px}
+.drow .k{color:var(--muted)}.drow .v{text-align:right}
+.mini-tbl{width:100%;border-collapse:collapse;font-size:10px;margin-top:6px}
+.mini-tbl th{padding:4px 7px;text-align:right;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)}
+.mini-tbl th:first-child{text-align:left}
+.mini-tbl td{padding:5px 7px;text-align:right;border-bottom:1px solid var(--border);color:var(--muted)}
+.mini-tbl td:first-child{text-align:left;color:var(--text)}
+.mini-tbl tr:last-child td{border-bottom:none}
+.detail-footer{display:flex;justify-content:flex-end;margin-top:14px}
+.btn-export{padding:7px 16px;background:transparent;border:1px solid var(--accent);color:var(--accent2);border-radius:6px;font-family:var(--font-m);font-size:11px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
+.btn-export:hover{background:rgba(124,107,255,.12);transform:translateY(-1px)}
+.btn-export:active{transform:none}
+svg.ico{width:12px;height:12px}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:10px 16px;font-family:var(--font-m);font-size:11px;color:var(--text);display:flex;align-items:center;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);transform:translateY(70px);opacity:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s;z-index:999;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.toast-dot.g{background:var(--green)}.toast-dot.a{background:var(--amber)}.toast-dot.r{background:var(--red)}
+
+/* Footer */
+.footer{border-top:1px solid var(--border);padding:40px 48px 0;margin-top:20px;font-family:var(--font-m)}
+.footer-cols{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:40px;padding-bottom:36px;border-bottom:1px solid var(--border)}
+.footer-col{display:flex;flex-direction:column;gap:8px}
+.footer-logo{font-family:var(--font-d);font-size:18px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
+.footer-logo span{color:var(--accent2)}
+.footer-ver{font-size:10px;color:var(--muted);letter-spacing:.06em}
+.footer-copy{font-size:10px;color:var(--muted)}
+.footer-col-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2px}
+.footer-cred{display:flex;align-items:center;gap:8px;font-size:11px}
+.footer-cred-label{color:var(--muted);min-width:80px}
+.footer-link{color:var(--accent2);text-decoration:none;transition:color .15s}
+.footer-link:hover{color:var(--accent);text-decoration:underline}
+.footer-disc{font-size:10px;color:rgba(251,191,36,.5);line-height:1.7}
+.footer-disc strong{color:rgba(251,191,36,.8)}
+.footer-bottom{padding:16px 0;font-size:10px;color:var(--muted);text-align:center;letter-spacing:.03em}
+
+@media(max-width:768px){
+  .header{padding:20px}.disclaimer{padding:10px 20px}
+  .upload-zone{padding:0 16px}.action-wrap,.prices-section{padding:0 16px}
+  .summary-bar,.table-area,.toolbar{padding:0 16px 24px}
+  .upload-title{font-size:28px}.detail-grid,.detail-tables{grid-template-columns:1fr}
+  .footer{padding:32px 16px 0}.footer-cols{grid-template-columns:1fr;gap:24px}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">Crypto<span>Lens</span></div>
+  <div class="header-tag">Transaction Analyzer v1.0 · Client-Side</div>
+</header>
+
+<div class="disclaimer">
+  <span>⚠&nbsp;</span>
+  <span><strong>Disclaimer:</strong> CryptoLens is a data analysis tool only. All calculations are generated from your CSV and market prices — they may contain errors. This is <strong>not financial advice</strong>. We are not responsible for any miscalculated or inaccurate data. Always verify independently before making financial decisions.</span>
+</div>
+
+<div class="session-banner" id="sessionBanner">
+  <div class="session-card">
+    <div class="session-info" id="sessionInfo">Previous session found</div>
+    <div class="session-btns">
+      <button class="btn-restore" onclick="restoreSession()">Restore Session</button>
+      <button class="btn-discard" onclick="discardSession()">Discard</button>
+    </div>
+  </div>
+</div>
+
+<div class="upload-zone" id="uploadZone">
+  <div class="upload-title">Analyze your<br><em>crypto portfolio</em></div>
+  <div class="upload-sub">// Drop a CSV export · No server needed · All processing happens in your browser</div>
+  <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+    <div class="drop-icon">⬆</div>
+    <div class="drop-text" id="dropText">Drop your CSV file here</div>
+    <div class="drop-hint">or click to browse · supports Crypto.com transaction exports</div>
+    <input type="file" id="fileInput" accept=".csv">
+  </div>
+</div>
+
+<div class="prices-section" id="pricesSection">
+  <div class="section-label">// Current prices (USD) — or click Fetch to auto-fill</div>
+  <div class="prices-grid" id="pricesGrid"></div>
+  <div class="fetch-status" id="fetchStatus"></div>
+</div>
+
+<div class="action-wrap" id="actionWrap">
+  <button class="btn-primary" onclick="runAnalysis()">Analyze Portfolio →</button>
+  <button class="btn-fetch" id="fetchBtn" onclick="fetchPrices()">
+    <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8a7 7 0 1 0 7-7"/><path d="M1 4v4h4"/></svg>
+    Fetch Live Prices
+  </button>
+  <button class="btn-sec" onclick="resetApp()">Reset</button>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Crunching the numbers…</div>
+</div>
+
+<div class="toolbar" id="toolbar">
+  <span class="toolbar-label">// Last analysed:</span>
+  <span class="tb-time" id="tbTime">—</span>
+  <button class="btn-tb btn-tb-teal" id="refetchBtn" onclick="refetchAndReanalyse()">
+    <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8a7 7 0 1 0 7-7"/><path d="M1 4v4h4"/></svg>
+    Fetch &amp; Re-analyse
+  </button>
+  <button class="btn-tb btn-tb-accent" onclick="reanalyseOnly()">↻ Re-analyse</button>
+  <button class="btn-tb btn-tb-muted" onclick="resetApp()">Reset</button>
+  <span class="tb-status" id="tbStatus"></span>
+</div>
+
+<div class="summary-bar" id="summaryBar">
+  <div class="summary-cards" id="summaryCards"></div>
+</div>
+
+<div class="table-area" id="tableArea">
+  <div class="table-title">// Portfolio breakdown — click any row to expand</div>
+  <table class="crypto-table">
+    <thead><tr>
+      <th>Asset</th><th>Avg Cost</th><th>Balance</th>
+      <th>Current Price</th><th>Current Value</th>
+      <th>Current G/L</th><th>Realised G/L</th>
+      <th>Buy</th><th>Sell</th><th>Earn Amount</th><th>Reward Amount</th><th></th>
+    </tr></thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<footer class="footer">
+  <div class="footer-cols">
+    <div class="footer-col">
+      <div class="footer-logo">Crypto<span>Lens</span></div>
+      <div class="footer-ver">Version 1.0 · Client-Side Edition</div>
+      <div class="footer-copy">&copy; 2026 CryptoLens. All rights reserved.</div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Credits</div>
+      <div class="footer-cred"><span class="footer-cred-label">Created by</span><a href="https://claude.ai/" target="_blank" class="footer-link">claude.ai</a></div>
+      <div class="footer-cred"><span class="footer-cred-label">Developer</span><span style="color:var(--text);font-size:11px">Bea Jutiseema</span></div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Disclaimer</div>
+      <div class="footer-disc">For informational purposes only. Data sourced from your CSV and live price feeds. Not financial advice. We are not responsible for any inaccurate data. <strong>Not financial advice.</strong></div>
+    </div>
+  </div>
+  <div class="footer-bottom">&copy; 2026 CryptoLens &nbsp;·&nbsp; Developed by Bea Jutiseema &nbsp;·&nbsp; Powered by <a href="https://claude.ai/" target="_blank" class="footer-link">Claude AI</a> &nbsp;·&nbsp; All rights reserved.</div>
+</footer>
+
+<div class="toast" id="toast"><div class="toast-dot g" id="toastDot"></div><span id="toastMsg"></span></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  CONSTANTS & STATE
+// ─────────────────────────────────────────────
+const STABLE = new Set(['USD','USDC']);
+const LS_KEY = 'cryptolens_v2';
+
+const COINGECKO_IDS = {
+  ADA:'cardano',AMP:'amp-token',AUDIO:'audius',AVAX:'avalanche-2',
+  BIFI:'beefy-finance',BNB:'binancecoin',BTC:'bitcoin',BUSD:'binance-usd',
+  CRO:'crypto-com-chain',DAI:'dai',DOGE:'dogecoin',DOT:'polkadot',
+  ELON:'dogelon-mars',ENJ:'enjincoin',EPS:'ellipsis',EPX:'ellipsis-x',
+  ETH:'ethereum',GALA:'gala',IQ:'everipedia',LINK:'chainlink',LRC:'loopring',
+  LUNA:'terra-luna',MATIC:'matic-network',ONE:'harmony',SAND:'the-sandbox',
+  SHIB:'shiba-inu',SLP:'smooth-love-potion',SOL:'solana',TONIC:'tectonic',
+  TRX:'tron',UNI:'uniswap',USDC:'usd-coin',USDT:'tether',VET:'vechain',
+  VVS:'vvs-finance',WAXP:'wax',XLM:'stellar',XRP:'ripple',XTZ:'tezos',
+};
+
+const BADGE_COLORS = {
+  ADA:['#1e3a5f','#60a5fa'],BTC:['#3b1f1f','#f87171'],CRO:['#1a3326','#3ecf8e'],
+  ELON:['#3b2e1a','#fbbf24'],ETH:['#2d1f4a','#a78bfa'],GALA:['#1a2e2e','#2dd4bf'],
+  IQ:['#2a2a2a','#e5e5e5'],LRC:['#1f2d4a','#60a5fa'],ONE:['#3b2e1a','#fbbf24'],
+  SAND:['#3b1f2d','#f472b6'],SHIB:['#3b1f1f','#f87171'],SLP:['#1a3326','#3ecf8e'],
+  USDC:['#1a2e2e','#2dd4bf'],VET:['#2d1f4a','#a78bfa'],WAXP:['#3b2e1a','#fbbf24'],
+  XLM:['#3b1f2d','#f472b6'],XRP:['#1e3a5f','#60a5fa'],
+};
+
+const KIND_LABELS = {
+  'viban_purchase':'Instant buy','van_purchase':'VAN purchase',
+  'crypto_purchase':'Direct purchase',
+  'trading.limit_order.cash_account.purchase_lock':'Limit order (lock)',
+  'trading.limit_order.cash_account.purchase_commit':'Limit order',
+};
+
+let parsedData = [];
+let csvContent = null;
+let detectedSymbols = [];
+let fileName = null;
+
+// ─────────────────────────────────────────────
+//  FORMATTERS
+// ─────────────────────────────────────────────
+const fmt = (v, dp=2) => v == null ? '—' : v.toLocaleString('en-US',{minimumFractionDigits:dp,maximumFractionDigits:dp});
+const fP  = v => {
+  if(v==null) return 'N/A';
+  if(v>=1000) return '$'+v.toLocaleString('en-US',{maximumFractionDigits:2});
+  if(v>=1) return '$'+v.toFixed(4);
+  if(v>=0.00001) return '$'+v.toFixed(6);
+  return '$'+v.toExponential(4);
+};
+const fAmt = (v,sym) => {
+  if(!v||v===0) return '<span class="dash">—</span>';
+  const n = Math.round(v);
+  return (Math.abs(v)>=1 ? n.toLocaleString() : v.toFixed(6)) + ' ' + sym;
+};
+const glSpan = v => {
+  if(v==null) return '<span class="dash">—</span>';
+  const s = (v>=0?'+':'−') + '$' + fmt(Math.abs(v));
+  return `<span class="${v>0?'val-green':v<0?'val-red':'dash'}">${s}</span>`;
+};
+const badgeSty = sym => {
+  const b = BADGE_COLORS[sym]||['#1e1e2e','#aaa'];
+  return `background:${b[0]};color:${b[1]}`;
+};
+const kindLabel = (k, fromCur) => {
+  if(KIND_LABELS[k]) return KIND_LABELS[k];
+  if(fromCur==='USDC') return 'USDC exchange';
+  return k.replace(/_/g,' ');
+};
+const timeSince = d => {
+  const s = Math.floor((Date.now()-d)/1000);
+  if(s<60) return s+'s ago';
+  if(s<3600) return Math.floor(s/60)+'m ago';
+  if(s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+};
+
+// ─────────────────────────────────────────────
+//  TOAST
+// ─────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='g') {
+  clearTimeout(toastTimer);
+  const t = document.getElementById('toast');
+  document.getElementById('toastDot').className = 'toast-dot '+type;
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// ─────────────────────────────────────────────
+//  LOCAL STORAGE
+// ─────────────────────────────────────────────
+function saveSession() {
+  if(!parsedData.length) return;
+  const prices = getPrices();
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      parsedData, prices, symbols: detectedSymbols,
+      csvContent, fileName, savedAt: new Date().toISOString()
+    }));
+  } catch(e) { /* quota exceeded */ }
+}
+function loadSession() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)||'null'); } catch(e) { return null; }
+}
+function clearSession() { localStorage.removeItem(LS_KEY); }
+
+function checkForSavedSession() {
+  const s = loadSession();
+  if(!s||!s.parsedData||!s.parsedData.length) return;
+  const when = new Date(s.savedAt);
+  document.getElementById('sessionInfo').innerHTML =
+    `<strong>Saved session found</strong> · ${s.fileName||'unknown file'} · ${s.parsedData.length} assets · saved ${timeSince(when)}`;
+  document.getElementById('sessionBanner').classList.add('show');
+}
+
+function restoreSession() {
+  const s = loadSession();
+  if(!s) return;
+  parsedData = s.parsedData;
+  csvContent = s.csvContent;
+  fileName   = s.fileName;
+  detectedSymbols = s.symbols||[];
+  document.getElementById('dropText').textContent = '✓ '+(fileName||'restored');
+  buildPriceInputs(detectedSymbols);
+  Object.entries(s.prices||{}).forEach(([sym,val])=>{
+    const el = document.getElementById('price_'+sym);
+    if(el) el.value = val;
+  });
+  document.getElementById('pricesSection').classList.add('show');
+  document.getElementById('sessionBanner').classList.remove('show');
+  renderResults(parsedData);
+  document.getElementById('toolbar').classList.add('show');
+  document.getElementById('tbTime').textContent = 'restored · '+timeSince(new Date(s.savedAt));
+  showToast('Session restored — '+parsedData.length+' assets loaded', 'g');
+}
+function discardSession() {
+  clearSession();
+  document.getElementById('sessionBanner').classList.remove('show');
+  showToast('Session cleared','a');
+}
+
+// ─────────────────────────────────────────────
+//  FILE HANDLING
+// ─────────────────────────────────────────────
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+document.getElementById('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if(!file||!file.name.endsWith('.csv')) return alert('Please upload a .csv file.');
+  fileName = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    csvContent = e.target.result;
+    const syms = detectSymbols(csvContent);
+    detectedSymbols = syms;
+    buildPriceInputs(syms);
+    document.getElementById('sessionBanner').classList.remove('show');
+    document.getElementById('pricesSection').classList.add('show');
+    document.getElementById('actionWrap').classList.add('show');
+    document.getElementById('dropText').textContent = '✓ '+file.name;
+  };
+  reader.readAsText(file);
+}
+
+function detectSymbols(csv) {
+  const lines = csv.split('\n');
+  const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+  const curIdx = headers.indexOf('Currency');
+  const toIdx  = headers.indexOf('To Currency');
+  const kIdx   = headers.indexOf('Transaction Kind');
+  const syms = new Set();
+  for(let i=1;i<lines.length;i++){
+    const cols = parseCSVLine(lines[i]);
+    if(!cols.length) continue;
+    const cur = (cols[curIdx]||'').trim();
+    const to  = (cols[toIdx]||'').trim();
+    const k   = (cols[kIdx]||'').trim();
+    if(STABLE.has(cur) && to && !STABLE.has(to)) syms.add(to);
+    else if(k==='crypto_purchase' && cur && !STABLE.has(cur)) syms.add(cur);
+    else if(cur && !STABLE.has(cur) && STABLE.has(to)) syms.add(cur);
+    else if(k==='crypto_earn_interest_paid' && cur && !STABLE.has(cur)) syms.add(cur);
+  }
+  return [...syms].sort();
+}
+
+function parseCSVLine(line) {
+  const result=[]; let cur=''; let inQ=false;
+  for(let i=0;i<line.length;i++){
+    if(line[i]==='"'){inQ=!inQ;}
+    else if(line[i]===','&&!inQ){result.push(cur);cur='';}
+    else{cur+=line[i];}
+  }
+  result.push(cur); return result;
+}
+
+function buildPriceInputs(syms) {
+  const grid = document.getElementById('pricesGrid');
+  grid.innerHTML = '';
+  syms.forEach(sym => {
+    const w = document.createElement('div'); w.className='price-input-wrap';
+    w.innerHTML = `<label>${sym}</label><input type="number" step="any" min="0" id="price_${sym}" placeholder="0.00">`;
+    grid.appendChild(w);
+  });
+}
+
+function getPrices() {
+  const prices = {};
+  document.querySelectorAll('.price-input-wrap input').forEach(inp => {
+    const sym = inp.id.replace('price_','');
+    const v = parseFloat(inp.value);
+    if(!isNaN(v)&&v>0) prices[sym] = v;
+  });
+  return prices;
+}
+
+// ─────────────────────────────────────────────
+//  CSV ANALYSIS (pure JS)
+// ─────────────────────────────────────────────
+function analyzeCSV(csv, prices) {
+  const result = Papa.parse(csv, { header:true, skipEmptyLines:true });
+  let rows = result.data;
+
+  // Parse and sort by date
+  rows.forEach(r => {
+    const ts = (r['Timestamp (UTC)']||'').trim();
+    let d = new Date(ts);
+    if(isNaN(d)) {
+      const parts = ts.split(' ');
+      if(parts.length===2) {
+        const [md,t] = parts;
+        const [m,dy,y] = md.split('/');
+        d = new Date(`${y}-${m.padStart(2,'0')}-${dy.padStart(2,'0')}T${t}`);
+      }
+    }
+    r._dt = isNaN(d) ? 0 : d.getTime();
+  });
+  rows.sort((a,b) => a._dt - b._dt);
+
+  const data = {};
+  const get = sym => {
+    if(!data[sym]) data[sym] = {
+      buy_cnt:0,buy_usd:0,buy_amt:0,
+      sell_cnt:0,sell_usd:0,sell_amt:0,
+      earn_cnt:0,earn_usd:0,earn_amt:0,
+      reward_cnt:0,reward_usd:0,reward_amt:0,
+      buys:[],sells:[],
+      _rbuy_amt:0,_rbuy_usd:0
+    };
+    return data[sym];
+  };
+
+  rows.forEach(r => {
+    const kind = (r['Transaction Kind']||'').trim();
+    const desc = (r['Transaction Description']||'').trim();
+    const cur  = (r['Currency']||'').trim();
+    const to   = (r['To Currency']||'').trim();
+    const amt    = parseFloat(r['Amount'])||0;
+    const toAmt  = parseFloat(r['To Amount'])||0;
+    const usd    = Math.abs(parseFloat(r['Native Amount (in USD)'])||0);
+    const dt = r._dt ? new Date(r._dt).toISOString().slice(0,10) : '';
+
+    // BUY: stable → crypto
+    if(STABLE.has(cur) && to && !STABLE.has(to)) {
+      const d = get(to);
+      d.buy_cnt++; d.buy_usd+=usd; d.buy_amt+=toAmt;
+      d._rbuy_amt+=toAmt; d._rbuy_usd+=usd;
+      const ac = toAmt>0 ? usd/toAmt : 0;
+      d.buys.push({date:dt,amt:toAmt>=1?Math.round(toAmt):toAmt,usd,kind,from_cur:cur,avg_cost:ac});
+    }
+    // BUY: direct crypto_purchase
+    else if(kind==='crypto_purchase' && cur && !STABLE.has(cur) && !to) {
+      const d = get(cur);
+      const a = Math.abs(amt);
+      d.buy_cnt++; d.buy_usd+=usd; d.buy_amt+=a;
+      d._rbuy_amt+=a; d._rbuy_usd+=usd;
+      const ac = a>0 ? usd/a : 0;
+      d.buys.push({date:dt,amt:a>=1?Math.round(a):a,usd,kind,from_cur:'direct',avg_cost:ac});
+    }
+    // SELL: crypto → stable
+    else if(cur && !STABLE.has(cur) && STABLE.has(to)) {
+      const d = get(cur);
+      const sa = Math.abs(amt);
+      const ac = d._rbuy_amt>0 ? d._rbuy_usd/d._rbuy_amt : 0;
+      const gl = usd - sa*ac;
+      d.sell_cnt++; d.sell_usd+=usd; d.sell_amt+=sa;
+      d.sells.push({date:dt,amt:sa>=1?Math.round(sa):sa,usd,avg_cost:ac,gl});
+    }
+    // SELL: card_top_up
+    else if(kind==='card_top_up' && cur && !STABLE.has(cur) && !to) {
+      const d = get(cur);
+      const sa = Math.abs(amt);
+      const ac = d._rbuy_amt>0 ? d._rbuy_usd/d._rbuy_amt : 0;
+      const gl = usd - sa*ac;
+      d.sell_cnt++; d.sell_usd+=usd; d.sell_amt+=sa;
+      d.sells.push({date:dt,amt:sa>=1?Math.round(sa):sa,usd,avg_cost:ac,gl});
+    }
+    // EARN interest
+    else if(kind==='crypto_earn_interest_paid') {
+      const d = get(cur);
+      d.earn_cnt++; d.earn_usd+=usd; d.earn_amt+=Math.abs(amt);
+    }
+    // REWARDS
+    else if(desc==='Mystery Box Rewards'||desc==='CRO Rewards') {
+      const d = get(cur);
+      d.reward_cnt++; d.reward_usd+=usd; d.reward_amt+=Math.abs(amt);
+    }
+  });
+
+  return Object.keys(data).sort().map(sym => {
+    const d = data[sym];
+    const avg_cost = d.buy_amt>0 ? d.buy_usd/d.buy_amt : 0;
+    const bal = Math.round(d.buy_amt + d.earn_amt + d.reward_amt - d.sell_amt);
+    const price = prices[sym]||null;
+    const bal_usd = price&&bal>0 ? +(bal*price).toFixed(2) : null;
+    const cur_gl  = price&&avg_cost>0 ? +((price-avg_cost)*bal).toFixed(2) : null;
+    const total_sell_gl = d.sells.reduce((s,x)=>s+x.gl, 0);
+    let realised_gl = null;
+    if(d.sell_cnt>0) realised_gl = +total_sell_gl.toFixed(2);
+    const total_tx = d.buy_cnt+d.sell_cnt+d.earn_cnt+d.reward_cnt;
+    return {
+      sym, avg_cost, bal, price, bal_usd, cur_gl, realised_gl, total_sell_gl,
+      buy_cnt:d.buy_cnt, buy_usd:+d.buy_usd.toFixed(2),
+      buy_amt: d.buy_amt>=1?Math.round(d.buy_amt):d.buy_amt,
+      sell_cnt:d.sell_cnt, sell_usd:+d.sell_usd.toFixed(2),
+      sell_amt: d.sell_amt>=1?Math.round(d.sell_amt):d.sell_amt,
+      earn_cnt:d.earn_cnt, earn_usd:+d.earn_usd.toFixed(2),
+      earn_amt: d.earn_amt>=1?Math.round(d.earn_amt):d.earn_amt,
+      reward_cnt:d.reward_cnt, reward_usd:+d.reward_usd.toFixed(2),
+      reward_amt: d.reward_amt>=1?Math.round(d.reward_amt):d.reward_amt,
+      buys:d.buys, sells:d.sells, total_tx
+    };
+  });
+}
+
+// ─────────────────────────────────────────────
+//  ANALYSIS FLOW
+// ─────────────────────────────────────────────
+function runAnalysis() {
+  if(!csvContent) return;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('actionWrap').classList.remove('show');
+  document.getElementById('summaryBar').classList.remove('show');
+  document.getElementById('tableArea').classList.remove('show');
+  document.getElementById('toolbar').classList.remove('show');
+  setTimeout(() => {
+    try {
+      parsedData = analyzeCSV(csvContent, getPrices());
+      renderResults(parsedData);
+      saveSession();
+      const now = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      document.getElementById('tbTime').textContent = 'today at '+now;
+      document.getElementById('toolbar').classList.add('show');
+      document.getElementById('tbStatus').innerHTML = '';
+      showToast('Analysis complete · '+parsedData.length+' assets','g');
+    } catch(e) {
+      alert('Error analysing file: '+e.message);
+      document.getElementById('actionWrap').classList.add('show');
+    }
+    document.getElementById('loading').classList.remove('show');
+  }, 50);
+}
+
+function reanalyseOnly() {
+  if(!parsedData.length) { runAnalysis(); return; }
+  const prices = getPrices();
+  parsedData.forEach(item => {
+    const p = prices[item.sym]||item.price||null;
+    item.price = p;
+    item.bal_usd = p&&item.bal>0 ? +(item.bal*p).toFixed(2) : null;
+    item.cur_gl  = p&&item.avg_cost>0 ? +((p-item.avg_cost)*item.bal).toFixed(2) : null;
+    if(item.sell_cnt>0) item.realised_gl = +item.total_sell_gl.toFixed(2);
+    else item.realised_gl = null;
+  });
+  renderResults(parsedData);
+  saveSession();
+  const now = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('tbTime').textContent = 'today at '+now;
+  showToast('Re-analysed with current prices','g');
+}
+
+async function fetchPrices() {
+  const btn = document.getElementById('fetchBtn');
+  const status = document.getElementById('fetchStatus');
+  const inputs = document.querySelectorAll('.price-input-wrap input');
+  if(!inputs.length){ showToast('Upload a CSV first','a'); return; }
+  const symbols = [...inputs].map(i=>i.id.replace('price_',''));
+  btn.disabled=true;
+  btn.innerHTML=`<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="animation:spin .7s linear infinite"><path d="M1 8a7 7 0 1 0 7-7"/><path d="M1 4v4h4"/></svg> Fetching...`;
+  try {
+    const ids=[]; const idToSym={};
+    symbols.forEach(s=>{ const id=COINGECKO_IDS[s.toUpperCase()]; if(id){ids.push(id);idToSym[id]=s.toUpperCase();} });
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd`;
+    const resp = await fetch(url);
+    const json = await resp.json();
+    let filled=0, notFound=[];
+    symbols.forEach(sym=>{
+      const id=COINGECKO_IDS[sym.toUpperCase()];
+      const price = id&&json[id]?json[id].usd:null;
+      if(price){
+        const inp=document.getElementById('price_'+sym);
+        if(inp){inp.value=price;inp.style.borderColor='var(--teal)';filled++;}
+      } else { notFound.push(sym); }
+    });
+    setTimeout(()=>document.querySelectorAll('.price-input-wrap input').forEach(i=>i.style.borderColor=''),2000);
+    let msg=`<span class="ok">✓ ${filled} prices fetched</span>`;
+    if(notFound.length) msg+=` <span class="warn">· N/A: ${notFound.join(', ')}</span>`;
+    status.innerHTML=msg;
+    showToast(`${filled} prices updated`,'g');
+  } catch(e) {
+    status.innerHTML=`<span class="err">✗ ${e.message}</span>`;
+    showToast('Failed to fetch prices','r');
+  }
+  btn.disabled=false;
+  btn.innerHTML=`<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8a7 7 0 1 0 7-7"/><path d="M1 4v4h4"/></svg> Fetch Live Prices`;
+}
+
+async function refetchAndReanalyse() {
+  const btn=document.getElementById('refetchBtn');
+  const tbStatus=document.getElementById('tbStatus');
+  const inputs=document.querySelectorAll('.price-input-wrap input');
+  if(!inputs.length){ showToast('No price inputs found','a'); return; }
+  const symbols=[...inputs].map(i=>i.id.replace('price_',''));
+  btn.disabled=true;
+  btn.innerHTML=`<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="animation:spin .7s linear infinite"><path d="M1 8a7 7 0 1 0 7-7"/><path d="M1 4v4h4"/></svg> Fetching...`;
+  try {
+    const ids=[]; const idToSym={};
+    symbols.forEach(s=>{ const id=COINGECKO_IDS[s.toUpperCase()]; if(id){ids.push(id);idToSym[id]=s.toUpperCase();} });
+    const url=`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd`;
+    const resp=await fetch(url); const json=await resp.json();
+    let filled=0, notFound=[];
+    symbols.forEach(sym=>{
+      const id=COINGECKO_IDS[sym.toUpperCase()];
+      const price=id&&json[id]?json[id].usd:null;
+      if(price){ const inp=document.getElementById('price_'+sym); if(inp){inp.value=price;filled++;} }
+      else notFound.push(sym);
+    });
+    let msg=`<span class="ok">✓ ${filled} prices updated</span>`;
+    if(notFound.length) msg+=` <span class="warn">· N/A: ${notFound.join(', ')}</span>`;
+    tbStatus.innerHTML=msg;
+    showToast(`Prices updated · running analysis…`,'g');
+    reanalyseOnly();
+  } catch(e) {
+    tbStatus.innerHTML=`<span class="err">✗ ${e.message}</span>`;
+    showToast('Failed to fetch prices','r');
+  }
+  btn.disabled=false;
+  btn.innerHTML=`<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8a7 7 0 1 0 7-7"/><path d="M1 4v4h4"/></svg> Fetch &amp; Re-analyse`;
+}
+
+function resetApp() {
+  csvContent=null; parsedData=[]; detectedSymbols=[]; fileName=null;
+  clearSession();
+  document.getElementById('fileInput').value='';
+  document.getElementById('dropText').textContent='Drop your CSV file here';
+  document.getElementById('pricesSection').classList.remove('show');
+  document.getElementById('actionWrap').classList.remove('show');
+  document.getElementById('summaryBar').classList.remove('show');
+  document.getElementById('tableArea').classList.remove('show');
+  document.getElementById('toolbar').classList.remove('show');
+  document.getElementById('sessionBanner').classList.remove('show');
+  document.getElementById('pricesGrid').innerHTML='';
+  document.getElementById('tableBody').innerHTML='';
+  document.getElementById('fetchStatus').innerHTML='';
+  document.getElementById('tbStatus').innerHTML='';
+  showToast('Session cleared','a');
+}
+
+// ─────────────────────────────────────────────
+//  RENDER RESULTS
+// ─────────────────────────────────────────────
+function renderResults(data) {
+  // Summary cards
+  const totalBuy  = data.reduce((s,d)=>s+d.buy_usd,0);
+  const totalSell = data.reduce((s,d)=>s+d.sell_usd,0);
+  const totalEarn = data.reduce((s,d)=>s+(d.earn_amt||0),0);
+  const totalRew  = data.reduce((s,d)=>s+(d.reward_amt||0),0);
+  const totalGL   = data.reduce((s,d)=>s+(d.cur_gl||0),0);
+  const totalVal  = data.reduce((s,d)=>s+(d.bal_usd||0),0);
+  const cards = [
+    {label:'Total Assets', val:data.length, cls:''},
+    {label:'Total Buy (USD)', val:'$'+fmt(totalBuy), cls:'val-red'},
+    {label:'Total Sell (USD)', val:'$'+fmt(totalSell), cls:'val-green'},
+    {label:'Portfolio Value', val:'$'+fmt(totalVal), cls:'val-blue'},
+    {label:'Current G/L', val:(totalGL>=0?'+':'-')+'$'+fmt(Math.abs(totalGL)), cls:totalGL>=0?'val-green':'val-red'},
+    {label:'Earn Interest', val:totalEarn>=1?Math.round(totalEarn).toLocaleString()+' tokens':totalEarn>0?totalEarn.toFixed(4)+'tokens':'—', cls:'val-teal'},
+    {label:'Rewards', val:totalRew>=1?Math.round(totalRew).toLocaleString()+' tokens':totalRew>0?totalRew.toFixed(4)+'tokens':'—', cls:'val-amber'},
+  ];
+  document.getElementById('summaryCards').innerHTML = cards.map(c=>
+    `<div class="sum-card"><div class="sum-label">${c.label}</div><div class="sum-value ${c.cls}">${c.val}</div></div>`
+  ).join('');
+  document.getElementById('summaryBar').classList.add('show');
+
+  // Table rows
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  data.forEach((c,idx) => {
+    const mainRow = document.createElement('tr');
+    mainRow.onclick = () => toggleDetail(idx);
+    mainRow.innerHTML = `
+      <td><span class="sym-badge" style="${badgeSty(c.sym)}">${c.sym}</span></td>
+      <td class="val">${c.avg_cost>0?fP(c.avg_cost):'<span class="dash">—</span>'}</td>
+      <td class="val">${c.bal>0?c.bal.toLocaleString()+' '+c.sym:'<span class="dash">—</span>'}</td>
+      <td class="val">${c.price?fP(c.price):'<span class="dash">—</span>'}</td>
+      <td class="${c.bal_usd?'val-blue':'dash'}">${c.bal_usd?'$'+fmt(c.bal_usd):'—'}</td>
+      <td>${glSpan(c.cur_gl)}</td>
+      <td>${c.sell_cnt>0?glSpan(c.realised_gl):'<span class="dash">—</span>'}</td>
+      <td class="val">${c.buy_cnt||'<span class="dash">—</span>'}</td>
+      <td class="val">${c.sell_cnt||'<span class="dash">—</span>'}</td>
+      <td class="${c.earn_amt?'val-teal':'dash'}">${c.earn_amt?(c.earn_amt>=1?Math.round(c.earn_amt).toLocaleString():c.earn_amt.toFixed(4))+' '+c.sym:'—'}</td>
+      <td class="${c.reward_amt?'val-amber':'dash'}">${c.reward_amt?(c.reward_amt>=1?Math.round(c.reward_amt).toLocaleString():c.reward_amt.toFixed(4))+' '+c.sym:'—'}</td>
+      <td><span style="color:var(--muted);font-size:11px">▼</span></td>`;
+    tbody.appendChild(mainRow);
+
+    // Build buy table
+    let buyTable = '';
+    if(c.buys&&c.buys.length>0) {
+      const rows = c.buys.map(b=>{
+        const af = b.amt>=1?Math.round(b.amt).toLocaleString():b.amt.toFixed?b.amt.toFixed(6):b.amt;
+        return `<tr><td>${b.date}</td><td>${af} ${c.sym}</td><td class="val-green">$${fmt(b.usd)}</td><td>${b.avg_cost?fP(b.avg_cost):'—'}</td><td>${kindLabel(b.kind,b.from_cur)}</td></tr>`;
+      }).join('');
+      const totAmt = c.buys.reduce((a,b)=>a+(b.amt||0),0);
+      buyTable = `<div class="dsec" style="color:var(--green)">Buy transactions</div>
+        <table class="mini-tbl"><thead><tr><th>Date</th><th>Amount</th><th>USD Spent</th><th>Avg Cost</th><th>Type</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+        ${c.buys.length>1?`<div style="display:flex;justify-content:space-between;padding:5px 7px 0;font-size:10px;color:var(--muted)">
+          <span>Total: <span style="color:var(--green);font-weight:600">${Math.round(totAmt).toLocaleString()} ${c.sym}</span></span>
+          <span style="color:var(--green);font-weight:600">$${fmt(c.buy_usd)}</span></div>`:''}`;
+    }
+
+    // Build sell table
+    let sellTable = '';
+    if(c.sells&&c.sells.length>0) {
+      const rows = c.sells.map(s=>{
+        const af = s.amt>=1?Math.round(s.amt).toLocaleString():s.amt.toFixed?s.amt.toFixed(6):s.amt;
+        const costBasis = s.amt * s.avg_cost;
+        const realGL = s.usd - costBasis;
+        return `<tr><td>${s.date}</td><td>${af} ${c.sym}</td><td class="val-red">$${fmt(s.usd)}</td><td>${fP(s.avg_cost)}</td><td>$${fmt(costBasis)}</td><td>${glSpan(realGL)}</td></tr>`;
+      }).join('');
+      const totalSGL = c.sells.reduce((a,s)=>a+(s.usd-s.amt*s.avg_cost),0);
+      sellTable = `<div class="dsec" style="color:var(--red)">Sell transactions</div>
+        <table class="mini-tbl"><thead><tr><th>Date</th><th>Amount</th><th>Sell USD</th><th>Avg Cost</th><th>Cost Basis</th><th>Realised G/L</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+        ${c.sells.length>1?`<div style="display:flex;justify-content:space-between;padding:5px 7px 0;font-size:10px;color:var(--muted)">
+          <span>Total: <span style="color:var(--red);font-weight:600">${Math.round(c.sell_amt).toLocaleString()} ${c.sym}</span></span>
+          <span><span style="color:var(--red);font-weight:600">$${fmt(c.sell_usd)}</span> &nbsp; Realised G/L: ${glSpan(totalSGL)}</span></div>`:''}`;
+    }
+
+    // Detail row
+    const detailRow = document.createElement('tr');
+    detailRow.className = 'detail-row';
+    detailRow.id = `dr-${idx}`;
+    detailRow.innerHTML = `<td class="detail-cell" colspan="12">
+      <div class="detail-inner">
+        <div class="detail-grid">
+          <div>
+            <div class="dsec">Transaction summary</div>
+            <div class="drows">
+              <div class="drow"><span class="k" style="color:#3ecf8e">Buy</span><span class="v">${c.buy_cnt} trades · $${fmt(c.buy_usd)}</span></div>
+              <div class="drow"><span class="k" style="color:#f87171">Sell</span><span class="v">${c.sell_cnt} trades · $${fmt(c.sell_usd)}</span></div>
+              <div class="drow"><span class="k" style="color:#60a5fa">Earn Interest</span><span class="v">${c.earn_cnt} tx · ${c.earn_amt?(c.earn_amt>=1?Math.round(c.earn_amt).toLocaleString():c.earn_amt.toFixed(6))+' '+c.sym:'—'} · $${fmt(c.earn_usd)}</span></div>
+              <div class="drow"><span class="k" style="color:#2dd4bf">Rewards</span><span class="v">${c.reward_cnt} tx · ${c.reward_amt?(c.reward_amt>=1?Math.round(c.reward_amt).toLocaleString():c.reward_amt.toFixed(6))+' '+c.sym:'—'} · $${fmt(c.reward_usd)}</span></div>
+              <div class="drow" style="border-top:1px solid var(--border);padding-top:7px;margin-top:3px"><span class="k">Avg Cost Price</span><span class="v">${c.avg_cost>0?fP(c.avg_cost):'—'}</span></div>
+              <div class="drow"><span class="k">Current Price</span><span class="v">${c.price?fP(c.price):'<span class="dash">—</span>'}</span></div>
+              <div class="drow"><span class="k">Total Balance</span><span class="v">${c.bal>0?c.bal.toLocaleString()+' '+c.sym:'—'}</span></div>
+              <div class="drow"><span class="k">Current Value</span><span class="${c.bal_usd?'val-blue':'dash'} v">${c.bal_usd?'$'+fmt(c.bal_usd):'N/A'}</span></div>
+              <div class="drow"><span class="k">Current G/L</span>${glSpan(c.cur_gl)}</div>
+              <div class="drow"><span class="k">Realised G/L</span>${c.sell_cnt>0?glSpan(c.realised_gl):'<span class="dash">—</span>'}</div>
+            </div>
+          </div>
+          <div>
+            <div class="dsec">Quick stats</div>
+            <div class="drows">
+              <div class="drow"><span class="k">Total Transactions</span><span class="v">${c.total_tx}</span></div>
+              <div class="drow"><span class="k">Buy amount</span><span class="val-green v">${c.buy_amt>=1?Math.round(c.buy_amt).toLocaleString()+' '+c.sym:c.buy_amt>0?c.buy_amt.toFixed(6)+' '+c.sym:'—'}</span></div>
+              <div class="drow"><span class="k">Sell amount</span><span class="val-red v">${c.sell_amt>=1?Math.round(c.sell_amt).toLocaleString()+' '+c.sym:c.sell_amt>0?c.sell_amt.toFixed(6)+' '+c.sym:'—'}</span></div>
+              <div class="drow"><span class="k">Earn amount</span><span class="val-teal v">${c.earn_amt>=1?Math.round(c.earn_amt).toLocaleString()+' '+c.sym:c.earn_amt>0?c.earn_amt.toFixed(6)+' '+c.sym:'—'}</span></div>
+              <div class="drow"><span class="k">Reward amount</span><span class="val-amber v">${c.reward_amt>=1?Math.round(c.reward_amt).toLocaleString()+' '+c.sym:c.reward_amt>0?c.reward_amt.toFixed(6)+' '+c.sym:'—'}</span></div>
+            </div>
+          </div>
+        </div>
+        ${(buyTable||sellTable)?`<div class="detail-tables">
+          <div>${buyTable||'<div class="dsec" style="opacity:.35">No buy transactions</div>'}</div>
+          <div>${sellTable||'<div class="dsec" style="opacity:.35">No sell transactions</div>'}</div>
+        </div>`:''}
+        <div class="detail-footer">
+          <button class="btn-export" onclick="exportPDF(${idx},event)">
+            <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
+            Export PDF
+          </button>
+        </div>
+      </div>
+    </td>`;
+    tbody.appendChild(detailRow);
+  });
+  document.getElementById('tableArea').classList.add('show');
+}
+
+function toggleDetail(idx) {
+  const row = document.getElementById(`dr-${idx}`);
+  document.querySelectorAll('.detail-row').forEach(r=>{ if(r.id!==`dr-${idx}`) r.classList.remove('open'); });
+  row.classList.toggle('open');
+}
+
+// ─────────────────────────────────────────────
+//  PDF EXPORT (jsPDF)
+// ─────────────────────────────────────────────
+function exportPDF(idx, e) {
+  e.stopPropagation();
+  const btn = e.currentTarget;
+  btn.textContent = 'Generating…';
+
+  const c = parsedData[idx];
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W = 210, MARGIN = 16, CW = W - 2*MARGIN;
+  let y = MARGIN;
+
+  const cH  = '#111111', cG = '#1a7a1a', cR = '#c0392b', cB = '#185FA5';
+  const cMu = '#888888', cLg = '#f5f5f5', cGr = '#dddddd';
+
+  const fmtPDF = (v,dp=2) => v==null?'—':v.toLocaleString('en-US',{minimumFractionDigits:dp,maximumFractionDigits:dp});
+  const fpPDF  = v => { if(v==null)return'N/A';if(v>=1000)return'$'+v.toLocaleString('en-US',{maximumFractionDigits:2});if(v>=1)return'$'+v.toFixed(4);if(v>=0.00001)return'$'+v.toFixed(6);return'$'+v.toExponential(4); };
+  const glPDF  = v => v==null?'—':(v>=0?'+':'-')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fAmtPDF= (v,s) => { if(!v||v===0)return'—'; const n=Math.round(v); return(Math.abs(v)>=1?n.toLocaleString():v.toFixed(6))+' '+s; };
+
+  const avg_cost = c.avg_cost;
+  const bal = c.bal;
+  const price = c.price;
+  const bal_usd = price&&bal>0 ? bal*price : null;
+  const cur_gl  = price&&avg_cost>0 ? (price-avg_cost)*bal : null;
+  const total_sell_gl = c.sells.reduce((s,x)=>s+x.gl,0);
+
+  const addLine = (text, x, yp, size, style, color) => {
+    doc.setFontSize(size); doc.setFont('helvetica', style||'normal');
+    doc.setTextColor(color||cH); doc.text(text, x, yp);
+  };
+  const addRect = (x, yp, w, h, fillColor) => {
+    doc.setFillColor(fillColor); doc.rect(x,yp,w,h,'F');
+  };
+  const addLine2 = (yp, color) => {
+    doc.setDrawColor(color||cGr); doc.setLineWidth(.3); doc.line(MARGIN,yp,W-MARGIN,yp);
+  };
+
+  // Title
+  doc.setFillColor('#0a0a0f'); doc.rect(0,0,210,297,'F');
+  addRect(MARGIN,y,CW,14,'#1a1a24');
+  addLine(c.sym+' Transaction Report', MARGIN+4, y+9, 14, 'bold','#e8e8f0');
+  addLine(`Generated: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}  |  Price: ${fpPDF(price)}`, W-MARGIN, y+5, 7,'normal','#6b6b80');
+  y += 18;
+
+  // Stat cards (3 per row)
+  const statCols = [
+    ['Total Balance', bal>0?`${bal.toLocaleString()} ${c.sym}`:'—', cH],
+    ['Current Value', bal_usd?'$'+fmtPDF(bal_usd):'N/A', cB],
+    ['Current G/L', glPDF(cur_gl), cur_gl&&cur_gl>=0?cG:cur_gl?cR:cMu],
+    ['Avg Cost Price', avg_cost?fpPDF(avg_cost):'—', cH],
+    ['Current Price', fpPDF(price), cH],
+    ['Realised G/L', c.sell_cnt>0?glPDF(c.sell_cnt>0?total_sell_gl:null):'—', c.sell_cnt>0&&total_sell_gl>=0?cG:c.sell_cnt>0?cR:cMu],
+  ];
+  const cw3 = CW/3 - 1.5;
+  for(let row=0;row<2;row++){
+    for(let col=0;col<3;col++){
+      const [label,val,color] = statCols[row*3+col];
+      const x = MARGIN + col*(cw3+2.25);
+      addRect(x,y,cw3,12,cLg);
+      addLine(label,x+3,y+5,6,'normal',cMu);
+      addLine(val,x+3,y+10,9,'bold',color);
+    }
+    y += 14;
+  }
+  y += 4;
+
+  // Transaction Details table
+  const headers1 = ['Category','Count','Amount','USD Value','Notes'];
+  const cw1 = [CW*0.30, CW*0.10, CW*0.20, CW*0.18, CW*0.22];
+  const rows1 = [
+    ['Buy', String(c.buy_cnt||'—'), fAmtPDF(c.buy_amt,c.sym), '$'+fmtPDF(c.buy_usd), `avg ${fpPDF(avg_cost)}`],
+    ['Sell / Exchange', String(c.sell_cnt||'—'), fAmtPDF(c.sell_amt,c.sym), '$'+fmtPDF(c.sell_usd), ''],
+    ['Earn Interest', String(c.earn_cnt||'—'), fAmtPDF(c.earn_amt,c.sym), '$'+fmtPDF(c.earn_usd), ''],
+    ['Rewards', String(c.reward_cnt||'—'), fAmtPDF(c.reward_amt,c.sym), '$'+fmtPDF(c.reward_usd), ''],
+    ['Total Balance','', fAmtPDF(bal,c.sym)||'—', bal_usd?'$'+fmtPDF(bal_usd):'N/A','buy+earn+reward-sell'],
+    ['Avg Cost Price','','', avg_cost?fpPDF(avg_cost):'—',''],
+    ['Current Price','','', fpPDF(price),''],
+    ['Current Value','', `${bal>0?bal.toLocaleString():''} x ${fpPDF(price)}`, bal_usd?'$'+fmtPDF(bal_usd):'N/A','balance x price'],
+    ['Current G/L','', price&&avg_cost?`(price-avg) x ${bal.toLocaleString()}`:'—', glPDF(cur_gl),''],
+    ['Realised G/L','','', c.sell_cnt>0?glPDF(total_sell_gl):'—', c.sell_cnt>0?'sell G/L':''],
+  ];
+
+  addLine('Transaction Details', MARGIN, y+4, 8, 'bold', cMu); y+=7;
+  // Header
+  addRect(MARGIN,y,CW,6,'#eeeeee');
+  let cx=MARGIN;
+  headers1.forEach((h,i)=>{ doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(cMu);doc.text(h,cx+2,y+4.2);cx+=cw1[i]; });
+  y+=6;
+  rows1.forEach((row,ri)=>{
+    if(ri>=4) { addRect(MARGIN,y,CW,6,'#f5f5f5'); }
+    else if(ri%2===1) { addRect(MARGIN,y,CW,6,'#fafafa'); }
+    cx=MARGIN;
+    row.forEach((cell,ci)=>{
+      doc.setFontSize(7.5);doc.setFont('helvetica',ri>=4?'bold':'normal');
+      let col=cH;
+      if(ri===0&&ci===0) col=cG;
+      if(ri===1&&ci===0) col=cR;
+      if(ri===2&&ci===0) col=cB;
+      if(ri===3&&ci===0) col='#085041';
+      if((ri===8)&&ci===3) col=cur_gl&&cur_gl>=0?cG:cur_gl?cR:cH;
+      if((ri===9)&&ci===3) col=c.sell_cnt>0?(total_sell_gl>=0?cG:cR):cMu;
+      doc.setTextColor(col);
+      doc.text(String(cell),cx+2,y+4.2);
+      cx+=cw1[ci];
+    });
+    y+=6;
+    if(y>260) { doc.addPage(); doc.setFillColor('#0a0a0f'); doc.rect(0,0,210,297,'F'); y=MARGIN; }
+  });
+  y+=4;
+
+  // Buy Transactions Detail
+  if(c.buys&&c.buys.length>0) {
+    if(y>240) { doc.addPage(); doc.setFillColor('#0a0a0f'); doc.rect(0,0,210,297,'F'); y=MARGIN; }
+    addLine('Buy Transactions Detail', MARGIN, y+4, 8,'bold',cMu); y+=7;
+    const bh=['Date','Amount Bought','USD Spent','Avg Cost','Type'];
+    const bcw=[CW*0.14,CW*0.18,CW*0.17,CW*0.18,CW*0.33];
+    addRect(MARGIN,y,CW,6,'#e8f5e9');
+    cx=MARGIN; bh.forEach((h,i)=>{doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor('#1a5c2e');doc.text(h,cx+2,y+4.2);cx+=bcw[i];});
+    y+=6;
+    c.buys.forEach((b,ri)=>{
+      if(y>260){doc.addPage();doc.setFillColor('#0a0a0f');doc.rect(0,0,210,297,'F');y=MARGIN;}
+      if(ri%2===1) addRect(MARGIN,y,CW,6,'#f9fff9');
+      const af = b.amt>=1?Math.round(b.amt).toLocaleString()+' '+c.sym:b.amt.toFixed(6)+' '+c.sym;
+      const kl = KIND_LABELS[b.kind]||(b.from_cur==='USDC'?'USDC exchange':b.kind.replace(/_/g,' '));
+      const cells=[b.date,af,'$'+fmtPDF(b.usd),b.avg_cost?fpPDF(b.avg_cost):'—',kl];
+      cx=MARGIN;
+      cells.forEach((cell,ci)=>{
+        doc.setFontSize(7.5);doc.setFont('helvetica','normal');
+        doc.setTextColor(ci===2?cG:cH);
+        doc.text(String(cell),cx+2,y+4.2);cx+=bcw[ci];
+      });
+      y+=6;
+    });
+    if(c.buys.length>1){
+      addRect(MARGIN,y,CW,6,cLg);
+      const totAmt=c.buys.reduce((a,b)=>a+(b.amt||0),0);
+      doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(cH);
+      doc.text('Total',MARGIN+2,y+4.2);
+      doc.setTextColor(cG);doc.text(Math.round(totAmt).toLocaleString()+' '+c.sym,MARGIN+bcw[0]+2,y+4.2);
+      doc.text('$'+fmtPDF(c.buy_usd),MARGIN+bcw[0]+bcw[1]+2,y+4.2);
+      y+=6;
+    }
+    y+=4;
+  }
+
+  // Sell Transactions Detail
+  if(c.sells&&c.sells.length>0) {
+    if(y>240){doc.addPage();doc.setFillColor('#0a0a0f');doc.rect(0,0,210,297,'F');y=MARGIN;}
+    addLine('Sell Transactions Detail', MARGIN, y+4, 8,'bold',cMu); y+=7;
+    const sh=['Date','Amount Sold','Sell USD','Avg Cost','Cost Basis','Realised G/L'];
+    const scw=[CW*0.13,CW*0.16,CW*0.16,CW*0.16,CW*0.17,CW*0.22];
+    addRect(MARGIN,y,CW,6,'#fdecea');
+    cx=MARGIN;sh.forEach((h,i)=>{doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor('#7f1d1d');doc.text(h,cx+2,y+4.2);cx+=scw[i];});
+    y+=6;
+    let totRGL=0;
+    c.sells.forEach((s,ri)=>{
+      if(y>260){doc.addPage();doc.setFillColor('#0a0a0f');doc.rect(0,0,210,297,'F');y=MARGIN;}
+      if(ri%2===1) addRect(MARGIN,y,CW,6,'#fffafa');
+      const af=s.amt>=1?Math.round(s.amt).toLocaleString()+' '+c.sym:s.amt.toFixed(6)+' '+c.sym;
+      const cb=s.amt*s.avg_cost; const rgl=s.usd-cb; totRGL+=rgl;
+      const cells=[s.date,af,'$'+fmtPDF(s.usd),fpPDF(s.avg_cost),'$'+fmtPDF(cb),glPDF(rgl)];
+      cx=MARGIN;
+      cells.forEach((cell,ci)=>{
+        doc.setFontSize(7.5);doc.setFont('helvetica','normal');
+        let col=cH;
+        if(ci===2) col=cR;
+        if(ci===5) col=rgl>=0?cG:cR;
+        doc.setTextColor(col); doc.text(String(cell),cx+2,y+4.2); cx+=scw[ci];
+      });
+      y+=6;
+    });
+    if(c.sells.length>1){
+      addRect(MARGIN,y,CW,6,cLg);
+      const totCB=c.sells.reduce((a,s)=>a+s.amt*s.avg_cost,0);
+      cx=MARGIN;
+      [['Total',cH],[Math.round(c.sell_amt).toLocaleString()+' '+c.sym,cR],['$'+fmtPDF(c.sell_usd),cR],['',''],['$'+fmtPDF(totCB),cH],[glPDF(totRGL),totRGL>=0?cG:cR]].forEach(([v,col],i)=>{
+        doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(col||cH);doc.text(String(v),cx+2,y+4.2);cx+=scw[i];
+      });
+      y+=6;
+    }
+    y+=4;
+  }
+
+  // Footer
+  if(y>268){doc.addPage();doc.setFillColor('#0a0a0f');doc.rect(0,0,210,297,'F');y=250;}
+  else y=275;
+  addLine2(y);
+  doc.setFontSize(6.5);doc.setFont('helvetica','normal');doc.setTextColor(cMu);
+  doc.text(`CryptoLens Report  |  ${c.sym}  |  Prices as of ${new Date().toLocaleDateString()}  |  Not financial advice`,MARGIN,y+4);
+
+  doc.save(`${c.sym}_report.pdf`);
+  btn.innerHTML = `<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg> Export PDF`;
+}
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+checkForSavedSession();
+</script>
+</body>
+</html>
