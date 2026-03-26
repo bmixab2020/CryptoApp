@@ -445,13 +445,26 @@ function handleFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     csvContent = e.target.result;
+
+    // ── Clear previous analysis completely ──
+    parsedData = [];
+    clearSession();
+    document.getElementById('summaryBar').classList.remove('show');
+    document.getElementById('tableArea').classList.remove('show');
+    document.getElementById('toolbar').classList.remove('show');
+    document.getElementById('sessionBanner').classList.remove('show');
+    document.getElementById('tableBody').innerHTML = '';
+    document.getElementById('summaryCards').innerHTML = '';
+    document.getElementById('tbStatus').innerHTML = '';
+    document.getElementById('fetchStatus').innerHTML = '';
+
     const syms = detectSymbols(csvContent);
     detectedSymbols = syms;
     buildPriceInputs(syms);
-    document.getElementById('sessionBanner').classList.remove('show');
     document.getElementById('pricesSection').classList.add('show');
     document.getElementById('actionWrap').classList.add('show');
     document.getElementById('dropText').textContent = '✓ '+file.name;
+    showToast('New file loaded — '+file.name, 'g');
   };
   reader.readAsText(file);
 }
