@@ -186,7 +186,7 @@ svg.ico{width:12px;height:12px}
 
 <header class="header">
   <div class="logo">Crypto<span>Lens</span></div>
-  <div class="header-tag">Transaction Analyzer v1.0 · Client-Side</div>
+  <div class="header-tag">Transaction Analyzer v1.1 · Client-Side</div>
 </header>
 
 <div class="disclaimer">
@@ -268,7 +268,7 @@ svg.ico{width:12px;height:12px}
   <div class="footer-cols">
     <div class="footer-col">
       <div class="footer-logo">Crypto<span>Lens</span></div>
-      <div class="footer-ver">Version 1.0 · Client-Side Edition</div>
+      <div class="footer-ver">Version 1.1 · Client-Side Edition · Updated March 27, 2026</div>
       <div class="footer-copy">&copy; 2026 CryptoLens. All rights reserved.</div>
     </div>
     <div class="footer-col">
@@ -949,8 +949,8 @@ function exportPDF(idx, e) {
   };
 
   // Title
-  doc.setFillColor('#0a0a0f'); doc.rect(0,0,210,297,'F');
-  addRect(MARGIN,y,CW,14,'#1a1a24');
+  doc.setFillColor('#ffffff'); doc.rect(0,0,210,297,'F');
+  addRect(MARGIN,y,CW,14,'#1e2235');
   addLine(c.sym+' Transaction Report', MARGIN+4, y+9, 14, 'bold','#e8e8f0');
   addLine(`Generated: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}  |  Price: ${fpPDF(price)}`, W-MARGIN, y+5, 7,'normal','#6b6b80');
   y += 18;
@@ -1001,7 +1001,7 @@ function exportPDF(idx, e) {
   y+=6;
   rows1.forEach((row,ri)=>{
     if(ri>=4) { addRect(MARGIN,y,CW,6,'#f5f5f5'); }
-    else if(ri%2===1) { addRect(MARGIN,y,CW,6,'#fafafa'); }
+    else if(ri%2===1) { addRect(MARGIN,y,CW,6,'#f7f7fb'); }
     cx=MARGIN;
     row.forEach((cell,ci)=>{
       doc.setFontSize(7.5);doc.setFont('helvetica',ri>=4?'bold':'normal');
@@ -1017,13 +1017,13 @@ function exportPDF(idx, e) {
       cx+=cw1[ci];
     });
     y+=6;
-    if(y>260) { doc.addPage(); doc.setFillColor('#0a0a0f'); doc.rect(0,0,210,297,'F'); y=MARGIN; }
+    if(y>260) { doc.addPage(); doc.setFillColor('#ffffff'); doc.rect(0,0,210,297,'F'); y=MARGIN; }
   });
   y+=4;
 
   // Buy Transactions Detail
   if(c.buys&&c.buys.length>0) {
-    if(y>240) { doc.addPage(); doc.setFillColor('#0a0a0f'); doc.rect(0,0,210,297,'F'); y=MARGIN; }
+    if(y>240) { doc.addPage(); doc.setFillColor('#ffffff'); doc.rect(0,0,210,297,'F'); y=MARGIN; }
     addLine('Buy Transactions Detail', MARGIN, y+4, 8,'bold',cMu); y+=7;
     const bh=['Date','Amount Bought','USD Spent','Avg Cost','Type'];
     const bcw=[CW*0.14,CW*0.18,CW*0.17,CW*0.18,CW*0.33];
@@ -1031,8 +1031,8 @@ function exportPDF(idx, e) {
     cx=MARGIN; bh.forEach((h,i)=>{doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor('#1a5c2e');doc.text(h,cx+2,y+4.2);cx+=bcw[i];});
     y+=6;
     c.buys.forEach((b,ri)=>{
-      if(y>260){doc.addPage();doc.setFillColor('#0a0a0f');doc.rect(0,0,210,297,'F');y=MARGIN;}
-      if(ri%2===1) addRect(MARGIN,y,CW,6,'#f9fff9');
+      if(y>260){doc.addPage();doc.setFillColor('#ffffff');doc.rect(0,0,210,297,'F');y=MARGIN;}
+      if(ri%2===1) addRect(MARGIN,y,CW,6,'#f0faf4');
       const af = b.amt>=1?Math.round(b.amt).toLocaleString()+' '+c.sym:b.amt.toFixed(6)+' '+c.sym;
       const kl = KIND_LABELS[b.kind]||(b.from_cur==='USDC'?'USDC exchange':b.kind.replace(/_/g,' '));
       const cells=[b.date,af,'$'+fmtPDF(b.usd),b.avg_cost?fpPDF(b.avg_cost):'—',kl];
@@ -1058,7 +1058,7 @@ function exportPDF(idx, e) {
 
   // Sell Transactions Detail
   if(c.sells&&c.sells.length>0) {
-    if(y>240){doc.addPage();doc.setFillColor('#0a0a0f');doc.rect(0,0,210,297,'F');y=MARGIN;}
+    if(y>240){doc.addPage();doc.setFillColor('#ffffff');doc.rect(0,0,210,297,'F');y=MARGIN;}
     addLine('Sell Transactions Detail', MARGIN, y+4, 8,'bold',cMu); y+=7;
     const sh=['Date','Amount Sold','Sell USD','Avg Cost','Cost Basis','Realised G/L'];
     const scw=[CW*0.13,CW*0.16,CW*0.16,CW*0.16,CW*0.17,CW*0.22];
@@ -1067,8 +1067,8 @@ function exportPDF(idx, e) {
     y+=6;
     let totRGL=0;
     c.sells.forEach((s,ri)=>{
-      if(y>260){doc.addPage();doc.setFillColor('#0a0a0f');doc.rect(0,0,210,297,'F');y=MARGIN;}
-      if(ri%2===1) addRect(MARGIN,y,CW,6,'#fffafa');
+      if(y>260){doc.addPage();doc.setFillColor('#ffffff');doc.rect(0,0,210,297,'F');y=MARGIN;}
+      if(ri%2===1) addRect(MARGIN,y,CW,6,'#fff5f5');
       const af=s.amt>=1?Math.round(s.amt).toLocaleString()+' '+c.sym:s.amt.toFixed(6)+' '+c.sym;
       const cb=s.amt*s.avg_cost; const rgl=s.usd-cb; totRGL+=rgl;
       const cells=[s.date,af,'$'+fmtPDF(s.usd),fpPDF(s.avg_cost),'$'+fmtPDF(cb),glPDF(rgl)];
@@ -1095,7 +1095,7 @@ function exportPDF(idx, e) {
   }
 
   // Footer
-  if(y>268){doc.addPage();doc.setFillColor('#0a0a0f');doc.rect(0,0,210,297,'F');y=250;}
+  if(y>268){doc.addPage();doc.setFillColor('#ffffff');doc.rect(0,0,210,297,'F');y=250;}
   else y=275;
   addLine2(y);
   doc.setFontSize(6.5);doc.setFont('helvetica','normal');doc.setTextColor(cMu);
