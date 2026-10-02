@@ -115,7 +115,10 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
 .table-area{padding:0 48px 60px;display:none}
 .table-area.show{display:block}
 .table-title{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;font-family:var(--font-m)}
-.crypto-table{width:100%;border-collapse:collapse;font-family:var(--font-m);font-size:12px}
+/* The table has 12 nowrap columns. Let it scroll inside its own box rather
+   than stretching the whole page wider than the phone screen. */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.crypto-table{width:100%;min-width:1080px;border-collapse:collapse;font-family:var(--font-m);font-size:12px}
 .crypto-table thead tr{border-bottom:1px solid var(--border2)}
 .crypto-table th{padding:9px 12px;text-align:right;color:var(--muted);font-size:10px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
 .crypto-table th:first-child{text-align:left}
@@ -179,6 +182,21 @@ svg.ico{width:12px;height:12px}
   .summary-bar,.table-area,.toolbar{padding:0 16px 24px}
   .upload-title{font-size:28px}.detail-grid,.detail-tables{grid-template-columns:1fr}
   .footer{padding:32px 16px 0}.footer-cols{grid-template-columns:1fr;gap:24px}
+  .detail-inner{padding:14px 12px;overflow-x:auto}
+  .toast{left:16px;right:16px;bottom:16px}
+}
+
+/* Touch devices need bigger tap targets and 16px inputs (iOS zooms the
+   viewport when focusing anything under 16px). Keyed off the pointer rather
+   than width so landscape phones wider than 768px are covered too. */
+@media(pointer:coarse){
+  .price-input-wrap input{font-size:16px}
+  .btn-tb,.btn-export,.btn-restore,.btn-discard{min-height:44px;padding:11px 16px;font-size:13px}
+  .btn-primary,.btn-fetch,.btn-sec{min-height:48px}
+  .action-wrap.show{flex-direction:column}
+  .action-wrap.show .btn-primary,
+  .action-wrap.show .btn-fetch,
+  .action-wrap.show .btn-sec{width:100%;justify-content:center}
 }
 </style>
 </head>
@@ -186,7 +204,7 @@ svg.ico{width:12px;height:12px}
 
 <header class="header">
   <div class="logo">Crypto<span>Lens</span></div>
-  <div class="header-tag">Transaction Analyzer v1.1 · Client-Side</div>
+  <div class="header-tag">Transaction Analyzer v1.2 · Client-Side</div>
 </header>
 
 <div class="disclaimer">
@@ -253,22 +271,24 @@ svg.ico{width:12px;height:12px}
 
 <div class="table-area" id="tableArea">
   <div class="table-title">// Portfolio breakdown — click any row to expand</div>
-  <table class="crypto-table">
-    <thead><tr>
-      <th>Asset</th><th>Avg Cost</th><th>Balance</th>
-      <th>Current Price</th><th>Current Value</th>
-      <th>Current G/L</th><th>Realised G/L</th>
-      <th>Buy</th><th>Sell</th><th>Earn Amount</th><th>Reward Amount</th><th></th>
-    </tr></thead>
-    <tbody id="tableBody"></tbody>
-  </table>
+  <div class="table-scroll">
+    <table class="crypto-table">
+      <thead><tr>
+        <th>Asset</th><th>Avg Cost</th><th>Balance</th>
+        <th>Current Price</th><th>Current Value</th>
+        <th>Current G/L</th><th>Realised G/L</th>
+        <th>Buy</th><th>Sell</th><th>Earn Amount</th><th>Reward Amount</th><th></th>
+      </tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <footer class="footer">
   <div class="footer-cols">
     <div class="footer-col">
       <div class="footer-logo">Crypto<span>Lens</span></div>
-      <div class="footer-ver">Version 1.1 · Client-Side Edition · Updated March 27, 2026</div>
+      <div class="footer-ver">Version 1.2 · Client-Side Edition · Updated October 1, 2026</div>
       <div class="footer-copy">&copy; 2026 CryptoLens. All rights reserved.</div>
     </div>
     <div class="footer-col">
